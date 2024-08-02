@@ -1,9 +1,11 @@
-{ config, options, lib, pkgs, ... }:
-
-with lib;
-
-let
-
+{
+  config,
+  options,
+  lib,
+  pkgs,
+  ...
+}:
+with lib; let
   cfg = config.home.pointerCursor;
 
   pointerCursorModule = types.submodule {
@@ -45,12 +47,39 @@ let
           gtk config generation for {option}`home.pointerCursor`
         '';
       };
+
+      hyprcursor = {
+        enable = mkEnableOption ''
+          hyprcursor config generation
+        '';
+
+        package = mkOption {
+          type = types.nullOr types.package;
+          example = literalExpression "pkgs.catppuccin-cursors.latteMauve";
+          default = null;
+          description = "Package providing the cursor theme.";
+        };
+
+        name = mkOption {
+          type = types.nullOr types.str;
+          example = "catppuccin-latte-mauve";
+          default = null;
+          description = "The cursor name within the package.";
+        };
+
+        size = mkOption {
+          type = types.nullOr types.int;
+          example = 34;
+          default = null;
+          description = "The cursor size for hyprcursor.";
+        };
+      };
     };
   };
 
   cursorPath = "${cfg.package}/share/icons/${escapeShellArg cfg.name}/cursors/${
-      escapeShellArg cfg.x11.defaultCursor
-    }";
+    escapeShellArg cfg.x11.defaultCursor
+  }";
 
   defaultIndexThemePackage = pkgs.writeTextFile {
     name = "index.theme";
@@ -67,40 +96,40 @@ let
   };
 
 in {
-  meta.maintainers = [ maintainers.league ];
+  meta.maintainers = [maintainers.league];
 
   imports = [
-    (mkAliasOptionModule [ "xsession" "pointerCursor" "package" ] [
+    (mkAliasOptionModule ["xsession" "pointerCursor" "package"] [
       "home"
       "pointerCursor"
       "package"
     ])
-    (mkAliasOptionModule [ "xsession" "pointerCursor" "name" ] [
+    (mkAliasOptionModule ["xsession" "pointerCursor" "name"] [
       "home"
       "pointerCursor"
       "name"
     ])
-    (mkAliasOptionModule [ "xsession" "pointerCursor" "size" ] [
+    (mkAliasOptionModule ["xsession" "pointerCursor" "size"] [
       "home"
       "pointerCursor"
       "size"
     ])
-    (mkAliasOptionModule [ "xsession" "pointerCursor" "defaultCursor" ] [
+    (mkAliasOptionModule ["xsession" "pointerCursor" "defaultCursor"] [
       "home"
       "pointerCursor"
       "x11"
       "defaultCursor"
     ])
 
-    ({ ... }: {
+    ({...}: {
       warnings = optional (any (x:
         getAttrFromPath
-        ([ "xsession" "pointerCursor" ] ++ [ x ] ++ [ "isDefined" ])
-        options) [ "package" "name" "size" "defaultCursor" ]) ''
-          The option `xsession.pointerCursor` has been merged into `home.pointerCursor` and will be removed
-          in the future. Please change to set `home.pointerCursor` directly and enable `home.pointerCursor.x11.enable`
-          to generate x11 specific cursor configurations. You can refer to the documentation for more details.
-        '';
+        (["xsession" "pointerCursor"] ++ [x] ++ ["isDefined"])
+        options) ["package" "name" "size" "defaultCursor"]) ''
+        The option `xsession.pointerCursor` has been merged into `home.pointerCursor` and will be removed
+        in the future. Please change to set `home.pointerCursor` directly and enable `home.pointerCursor.x11.enable`
+        to generate x11 specific cursor configurations. You can refer to the documentation for more details.
+      '';
     })
   ];
 
@@ -134,15 +163,16 @@ in {
         (hm.assertions.assertPlatform "home.pointerCursor" pkgs platforms.linux)
       ];
 
-      home.packages = [ cfg.package defaultIndexThemePackage ];
+      home.packages = [cfg.package defaultIndexThemePackage];
 
       # Set directory to look for cursors in, needed for some applications
       # that are unable to find cursors otherwise. See:
       # https://github.com/nix-community/home-manager/issues/2812
       # https://wiki.archlinux.org/title/Cursor_themes#Environment_variable
       home.sessionVariables = {
-        XCURSOR_PATH = mkDefault ("$XCURSOR_PATH\${XCURSOR_PATH:+:}"
-          + "${config.home.profileDirectory}/share/icons");
+        XCURSOR_PATH =
+          mkDefault ("$XCURSOR_PATH\${XCURSOR_PATH:+:}"
+            + "${config.home.profileDirectory}/share/icons");
         XCURSOR_SIZE = mkDefault cfg.size;
         XCURSOR_THEME = mkDefault cfg.name;
       };
@@ -150,16 +180,12 @@ in {
       # Add symlink of cursor icon directory to $HOME/.icons, needed for
       # backwards compatibility with some applications. See:
       # https://specifications.freedesktop.org/icon-theme-spec/latest/ar01s03.html
-      home.file.".icons/default/index.theme".source =
-        "${defaultIndexThemePackage}/share/icons/default/index.theme";
-      home.file.".icons/${cfg.name}".source =
-        "${cfg.package}/share/icons/${cfg.name}";
+      home.file.".icons/default/index.theme".source = "${defaultIndexThemePackage}/share/icons/default/index.theme";
+      home.file.".icons/${cfg.name}".source = "${cfg.package}/share/icons/${cfg.name}";
 
       # Add cursor icon link to $XDG_DATA_HOME/icons as well for redundancy.
-      xdg.dataFile."icons/default/index.theme".source =
-        "${defaultIndexThemePackage}/share/icons/default/index.theme";
-      xdg.dataFile."icons/${cfg.name}".source =
-        "${cfg.package}/share/icons/${cfg.name}";
+      xdg.dataFile."icons/default/index.theme".source = "${defaultIndexThemePackage}/share/icons/default/index.theme";
+      xdg.dataFile."icons/${cfg.name}".source = "${cfg.package}/share/icons/${cfg.name}";
     }
 
     (mkIf cfg.x11.enable {
@@ -176,7 +202,14 @@ in {
     })
 
     (mkIf cfg.gtk.enable {
-      gtk.cursorTheme = mkDefault { inherit (cfg) package name size; };
+      gtk.cursorTheme = mkDefault {inherit (cfg) package name size;};
+    })
+
+    (mkIf cfg.hyprcursor.enable {
+      home.sessionVariables = {
+        HYPRCURSOR_THEME = if isNull cfg.hyprcursor.name then cfg.name else cfg.hyprcursor.name;
+        HYPRCURSOR_SIZE = if isNull cfg.hyprcursor.size then cfg.size else cfg.hyprcursor.name;
+      };
     })
   ]);
 }
